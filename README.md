@@ -1,4 +1,4 @@
-# Variogram-type study, v2
+# Variogram-type study
 
 Which experimental variogram type (GSLIB `gamv` 1, 4, 5, 6, 7, 8, plus cumulative and normal-score
 semivariograms) gives the best continuity model, map and development decision from sparse wells?
