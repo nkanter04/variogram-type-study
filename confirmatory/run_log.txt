@@ -1,0 +1,12 @@
+1200 truth models, seed 31337, 14 processes
+  120/1200 (186 s)
+  240/1200 (232 s)
+  360/1200 (289 s)
+  480/1200 (327 s)
+  600/1200 (355 s)
+  720/1200 (511 s)
+  840/1200 (566 s)
+  960/1200 (614 s)
+  1080/1200 (656 s)
+  1200/1200 (690 s)
+saved C:\Users\nkant\Projects\variogram-type-study\confirmatory\results (691 s)
