@@ -1,0 +1,9 @@
+main: 120 truth models x 6 well sets on 14 processes
+  15/120 done (44 s)
+  30/120 done (68 s)
+  45/120 done (87 s)
+  60/120 done (109 s)
+  75/120 done (133 s)
+  90/120 done (156 s)
+  105/120 done (230 s)
+  120/120 done (277 s)
