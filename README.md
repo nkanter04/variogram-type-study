@@ -11,20 +11,24 @@ pip install -r requirements.txt
 python tests/check_core.py
 python run_study.py pilot
 python run_study.py main
+python tests/check_sgs.py
+python run_study.py aoi
 ```
 
-The results of both runs are already committed in `results/`, so the notebooks open without re-running the study.
+The results of all runs are already committed in `results/`, so the notebooks open without re-running the study.
 Open them in order; each runs in under a minute:
 
 1. `01_truths_and_wells.ipynb`: scenarios, truth models, exhaustive variograms, well designs, declustering
 2. `02_variograms.ipynb`: experimental variograms, azimuth inference, fitting, pilot trimming rule, accuracy
 3. `03_kriging_decisions.ipynb`: kriging, OOIP, uncertainty, well placement, value of information, executive summary
+4. `04_aoi_simulation.ipynb`: area-of-interest volumetrics with sequential Gaussian simulation; how variogram azimuth,
+   range and type shift the AOI average porosity and OOIP (global vs local AOIs, 3 realizations shown, 100 per model)
 
 `tests/check_core.py` also compares the experimental variograms with the original study's saved results
 when the environment variable `VARIOGRAM_ORIGINAL_DATA` points at that study's `data` folder.
 
-Run times on a 16-core laptop: checks ~1 min, pilot ~40 s, main ~4 min. Needs numpy, scipy, pandas and matplotlib
-(Anaconda); no GeostatsPy or GSLIB executables.
+Run times on a 16-core laptop: checks ~1 min each, pilot ~40 s, main ~4 min, aoi ~2 min. Needs numpy, scipy, pandas,
+matplotlib and numba (all in Anaconda); no GeostatsPy or GSLIB executables.
 
 ## Code (`vstudy/`)
 
@@ -37,6 +41,8 @@ Run times on a 16-core laptop: checks ~1 min, pilot ~40 s, main ~4 min. Needs nu
 | `fitting.py` | azimuth inference + pair-weighted grid-search fit |
 | `crossval.py` | closed-form leave-one-out kriging errors |
 | `kriging.py` | ordinary/simple kriging, inverse distance, conditional simulation, E-type |
+| `sgs.py` | sequential Gaussian simulation (GSLIB sgsim algorithm, numba-compiled, ~0.4 s per realization) |
+| `aoi.py` | AOIs as NumPy slices, AOI selection, SGS runner and figures for notebook 4 |
 | `decisions.py` | drainage value, greedy + swap well placement, random benchmark |
 | `pipeline.py` | per-truth workflow, parallel runner, cache; `build_dataset()` recreates any dataset |
 | `stats.py`, `analysis.py`, `plots.py` | clustered tests, summary tables, figures |

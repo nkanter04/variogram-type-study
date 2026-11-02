@@ -1,0 +1,35 @@
+[
+  {
+    "name": "global (whole field)",
+    "rows": [
+      0,
+      100
+    ],
+    "cols": [
+      0,
+      100
+    ]
+  },
+  {
+    "name": "local, variogram-sensitive",
+    "rows": [
+      19,
+      39
+    ],
+    "cols": [
+      41,
+      61
+    ]
+  },
+  {
+    "name": "local, azimuth-insensitive",
+    "rows": [
+      57,
+      77
+    ],
+    "cols": [
+      39,
+      59
+    ]
+  }
+]
