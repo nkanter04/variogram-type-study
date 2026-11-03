@@ -70,6 +70,40 @@ def place(dv_map, optimizer='greedy'):
     return improve(vals, s) if optimizer == 'swap' else s
 
 
+def _feasible(chosen):
+    feas = np.ones(len(CAND), bool)
+    for j in chosen:
+        feas &= np.hypot(CX - CX[j], CY - CY[j]) >= 2 * C.R_DRAIN
+    feas[list(chosen)] = False
+    return feas
+
+
+def place_quantile(vals, q):
+    """Sites that maximize the q-quantile over realizations of the program's drained OOIP.
+
+    vals: (n_realizations, len(CAND)) drainage value of every candidate in every realization.
+    q = 0.1 is a risk-averse choice (best P10 outcome). Greedy, then 1-swap improvement, as place()."""
+    obj = lambda tot: np.quantile(tot, q, axis=0)
+    chosen, base = [], np.zeros(vals.shape[0])
+    for _ in range(C.K_WELLS):
+        i = int(np.argmax(np.where(_feasible(chosen), obj(base[:, None] + vals), -np.inf)))
+        chosen.append(i)
+        base += vals[:, i]
+    current = float(obj(base))
+    while True:
+        best = None
+        for k in range(len(chosen)):
+            others = chosen[:k] + chosen[k + 1:]
+            score = np.where(_feasible(others), obj(vals[:, others].sum(1)[:, None] + vals), -np.inf)
+            score[chosen] = -np.inf
+            i = int(np.argmax(score))
+            if score[i] > current + 1e-12 and (best is None or score[i] > best[2]):
+                best = (k, i, float(score[i]))
+        if best is None:
+            return chosen
+        chosen[best[0]], current = best[1], best[2]
+
+
 def program_value(sites, dv_map):
     return float(dv_map.ravel()[CAND][sites].sum())
 

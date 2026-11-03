@@ -20,14 +20,15 @@ Open them in order; each runs in under a minute:
 
 1. `01_truths_and_wells.ipynb`: scenarios, truth models, exhaustive variograms, well designs, declustering
 2. `02_variograms.ipynb`: experimental variograms, azimuth inference, fitting, pilot trimming rule, accuracy
-3. `03_kriging_decisions.ipynb`: kriging, OOIP, uncertainty, well placement, value of information, executive summary
+3. `03_kriging_decisions.ipynb`: estimation by kriging and by sequential Gaussian simulation (50 realizations per
+   variogram model), OOIP, uncertainty, well placement, value of information, executive summary
 4. `04_aoi_simulation.ipynb`: area-of-interest volumetrics with sequential Gaussian simulation; how variogram azimuth,
    range and type shift the AOI average porosity and OOIP (global vs local AOIs, 3 realizations shown, 100 per model)
 
 `tests/check_core.py` also compares the experimental variograms with the original study's saved results
 when the environment variable `VARIOGRAM_ORIGINAL_DATA` points at that study's `data` folder.
 
-Run times on a 16-core laptop: checks ~1 min each, pilot ~40 s, main ~4 min, aoi ~2 min. Needs numpy, scipy, pandas,
+Run times on a 16-core laptop: checks ~1 min each, pilot ~1 min, main ~40 min (mostly the simulations), aoi ~2 min. Needs numpy, scipy, pandas,
 matplotlib and numba (all in Anaconda); no GeostatsPy or GSLIB executables.
 
 ## Code (`vstudy/`)

@@ -12,7 +12,7 @@ import pandas as pd
 from scipy.stats import skew
 
 from . import config as C
-from . import crossval, decisions as D, fitting, kriging, wells as W
+from . import crossval, decisions as D, fitting, kriging, sgs, wells as W
 from .simulate import make_truth, truth_rng
 from .variography import Truth, experimental
 
@@ -57,7 +57,7 @@ def run_truth(args):
     T = dict(truths=[dict(scenario=scenario, realization=real, true_ooip=true_ooip, opt_value=v_opt,
                           mean_phi=phi.mean(), std_phi=phi.std(), skew_phi=float(skew(phi.ravel())),
                           **{f'ref_{k}': v for k, v in ref.items()}, ref_vario_rmse=truth.short_rmse(ref))],
-             fits=[], estimates=[], decisions=[], uncertainty=[])
+             fits=[], estimates=[], decisions=[], uncertainty=[], simulation=[])
 
     for n_wells in C.WELL_COUNTS:
         for design in C.DESIGNS:
@@ -115,7 +115,45 @@ def run_truth(args):
                                        est_value=D.program_value(s, dv)))
             T['decisions'].append(dict(**key, method='random', sites='', opt_value=v_opt,
                                        true_value=D.random_programs(dv_true, C.N_RANDOM, rng), est_value=np.nan))
+
+            # ---- estimation by sequential Gaussian simulation, one set of realizations per variogram model
+            sim_rows, sim_dec = simulate_and_decide(stage, key, x, y, ds['ns'], all_models, choice, phi, dv_true, v_opt, true_ooip)
+            T['simulation'] += sim_rows
+            T['decisions'] += sim_dec
     return T
+
+
+SIM_TAGS = {'sgs_ev': None, 'sgs_p10': C.RISK_Q}      # decision rules on the realizations
+
+
+def simulate_and_decide(stage, key, x, y, ns, all_models, choice, phi, dv_true, v_opt, true_ooip):
+    """N_SGS realizations per variogram model (the 8 types and the true variogram; the cross-validation
+    pick reuses its type's). Decisions (PGE 338 Lecture 16c): sgs_ev places the wells that maximize the
+    expected drained OOIP over the realizations; sgs_p10 the wells that maximize its P10 (risk-averse).
+    Each model's fitted standardized variogram is used for the declustered normal scores."""
+    base = C.SEED_PILOT if stage == 'pilot' else C.SEED_MAIN
+    ids = [C.SCEN_NAMES.index(key['scenario']), key['realization'], key['n_wells'], C.DESIGNS.index(key['design'])]
+    rows, dec = [], []
+    for mi, meth in enumerate(C.VTYPES + ['truth_variogram']):
+        reals = sgs.simulate(x, y, ns, all_models[meth], C.N_SGS, np.random.default_rng([base, *ids, 2, mi]))
+        vals = np.array([D.drainage_from_ooip(C.ooip_cells(r)).ravel()[D.CAND] for r in reals])   # (L, n_cand)
+        tot = C.ooip_total(reals)
+        p10, p90 = np.percentile(tot, [10, 90])
+        rows.append(dict(**key, method=meth, ooip_p10=p10, ooip_p50=np.percentile(tot, 50), ooip_p90=p90,
+                         true_ooip=true_ooip, ooip_inside_p10_p90=bool(p10 <= true_ooip <= p90),
+                         sd_field_mean_phi=float(reals.mean((1, 2)).std(ddof=1)),
+                         rmse_phi_realization=float(np.sqrt(np.mean((reals - phi) ** 2)))))
+        for tag, q in SIM_TAGS.items():
+            s = D.greedy(vals.mean(0)) if q is None else None
+            s = D.improve(vals.mean(0), s) if q is None else D.place_quantile(vals, q)
+            prog = vals[:, s].sum(1)
+            tv = D.program_value(s, dv_true)
+            lo, hi = np.percentile(prog, [10, 90])
+            for name in [meth] + (['loocv'] if meth == choice else []):
+                dec.append(dict(**key, method=f'{name}@{tag}', sites=' '.join(map(str, sorted(s))), opt_value=v_opt,
+                                true_value=tv, est_value=float(prog.mean()), est_p10=lo, est_p90=hi,
+                                inside_p10_p90=bool(lo <= tv <= hi)))
+    return rows, dec
 
 
 def _finalize(parts):
@@ -136,7 +174,8 @@ def run_study(stage='main', workers=None, force=False, log=print):
     folder = os.path.join(HERE, 'results', stage)
     names = ['truths', 'fits', 'estimates', 'decisions', 'uncertainty']
     if not force and all(os.path.exists(os.path.join(folder, f'{n}.csv')) for n in names):
-        return {n: pd.read_csv(os.path.join(folder, f'{n}.csv')) for n in names}
+        extra = [n for n in ['simulation'] if os.path.exists(os.path.join(folder, f'{n}.csv'))]
+        return {n: pd.read_csv(os.path.join(folder, f'{n}.csv')) for n in names + extra}
     n_real = C.N_REAL_PILOT if stage == 'pilot' else C.N_REAL
     jobs = [(stage, s, r) for s in C.SCEN_NAMES for r in range(n_real)]
     workers = workers or max(1, (os.cpu_count() or 2) - 2)

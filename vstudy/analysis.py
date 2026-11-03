@@ -68,3 +68,49 @@ def trimmed_types(pilot_dec, threshold=C.TRIM_SAME_SITES):
         else:
             kept.append(vt)
     return kept, merged
+
+
+# ------------------------------------------------------------------ estimation by simulation (SGS)
+RULES = {'kriged map': '', 'SGS expected value': '@sgs_ev', 'SGS risk-averse (P10)': '@sgs_p10'}
+
+
+def rule_frame(dec, suffix):
+    """Decision rows of one rule, with the rule suffix stripped from the method name."""
+    if suffix:
+        d = dec[dec.method.str.endswith(suffix)].copy()
+        d['method'] = d.method.str[:-len(suffix)]
+        return d
+    return dec[~dec.method.str.contains('@')]
+
+
+def type_separation(dec):
+    """How differently the 8 variogram types decide under each rule, per well count:
+    spread of mean regret across types, % of datasets where a type picks the same sites as the
+    semivariogram (average over the 7 alternatives), and how many types differ significantly from the
+    semivariogram (Holm)."""
+    rows = []
+    for rule, suf in RULES.items():
+        d = rule_frame(dec, suf)
+        for n in sorted(d.n_wells.unique()):
+            dn = d[d.n_wells == n]
+            mean = dn[dn.method.isin(C.VTYPES)].groupby('method').regret_MM.mean()
+            piv = dn[dn.method.isin(C.VTYPES)].pivot_table(index=KEY, columns='method', values='sites', aggfunc='first')
+            same = np.mean([(piv[t] == piv['semivariogram']).mean() for t in C.VTYPES[1:]]) * 100
+            pt = paired_table(dn, 'regret_MM', C.VTYPES[1:])
+            rows.append({'rule': rule, 'n_wells': n, 'spread of mean regret across types ($MM)': mean.max() - mean.min(),
+                         'same sites as semivariogram (%)': same,
+                         'types significantly better': int(((pt.p_holm < 0.05) & (pt.mean_diff < 0)).sum()),
+                         'types significantly worse': int(((pt.p_holm < 0.05) & (pt.mean_diff > 0)).sum())})
+    return pd.DataFrame(rows).set_index(['rule', 'n_wells'])
+
+
+def rule_vs_kriging(dec, methods=('semivariogram', 'normal_score', 'loocv', 'truth_variogram')):
+    """Regret of each SGS rule minus the kriged-map decision with the same variogram model ($MM),
+    averaged within truth models, with 95% CI."""
+    rows = []
+    for rule, suf in list(RULES.items())[1:]:
+        for m in methods:
+            for n in sorted(dec.n_wells.unique()):
+                mean, lo, hi, g = truth_level_diff(dec, 'regret_MM', dict(method=m + suf, n_wells=n), dict(method=m, n_wells=n))
+                rows.append(dict(rule=rule, method=m, n_wells=n, diff_MM=mean, ci_lo=lo, ci_hi=hi))
+    return pd.DataFrame(rows).set_index(['rule', 'method', 'n_wells'])

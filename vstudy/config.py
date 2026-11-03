@@ -64,6 +64,8 @@ SCORE_HSHORT = 250.0                     # variogram accuracy scored on lags <= 
 
 # ---------------------------------------------------------------- uncertainty and decisions
 N_SIM = 50                               # conditional simulations (normal-score model) for the OOIP range
+N_SGS = 50                               # sequential Gaussian simulations per variogram model and dataset
+RISK_Q = 0.10                            # risk-averse decision: maximize the P10 program value
 N_QUAD = 20                              # Gauss-Hermite nodes for the expected-value (E-type) map
 K_WELLS, R_DRAIN = 3, 150.0
 RF, NETBACK, WELL_COST = 0.30, 35.0, 6.0  # recovery factor, $/bbl netback, $MM per well

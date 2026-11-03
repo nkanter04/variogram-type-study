@@ -93,7 +93,8 @@ check('E-type quadrature = mean of 400 simulations (total OOIP)', abs(et - mc.me
 t0 = time.time()
 out = run_truth(('pilot', 'facies', 0))
 d = pd.DataFrame(out['decisions'])
-check('one truth model end to end', len(d) == len(C.WELL_COUNTS) * len(C.DESIGNS) * (len(C.VTYPES) + 5),
+check('one truth model end to end', (~d.method.str.contains('@')).sum() == len(C.WELL_COUNTS) * len(C.DESIGNS) * (len(C.VTYPES) + 5)
+      and d.method.str.contains('@').sum() == len(C.WELL_COUNTS) * len(C.DESIGNS) * 2 * (len(C.VTYPES) + 2),
       f'{len(d)} decisions in {time.time() - t0:.1f} s')
 
 print(f"\n{sum(results)}/{len(results)} checks passed")
