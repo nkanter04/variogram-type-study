@@ -1,0 +1,50 @@
+{
+  "title": "Confirmatory test of variogram-type leads from the main study",
+  "registered": "2026-10-23, committed before any confirmatory data was generated",
+  "seed": 31337,
+  "seed_note": "Never used by the main study (20261014) or pilot (777). Smoke tests use seed 999 and their results are discarded.",
+  "primary_metric": "regret_MM: well-placement regret in $MM per 3-well program (same decision model as the main study)",
+  "unit_of_analysis": "truth model: the regret difference (method - semivariogram) is averaged over the random and preferential designs within each truth model",
+  "n_truths_per_scenario": 200,
+  "power_basis": "Per-truth SD of the difference in the main study was 0.81-0.97 $MM (single scenario, 50 wells) and 1.14 $MM (pooled, 25 wells). n = 200 gives ~80% power to detect 0.25 $MM at the Holm worst-case level 0.05/7 (two-sided).",
+  "smallest_effect_of_interest_MM": 0.25,
+  "test": "two-sided one-sample t-test on per-truth differences; Holm correction across H1-H7 at family-wise alpha 0.05",
+  "decision_rule": {
+    "CONFIRMED": "Holm-adjusted p < 0.05 and mean difference < 0 (method has lower regret than the semivariogram)",
+    "REVERSED": "Holm-adjusted p < 0.05 and mean difference > 0",
+    "EQUIVALENT": "not significant and the 90% CI lies inside +/- 0.25 $MM (two one-sided tests)",
+    "INCONCLUSIVE": "otherwise"
+  },
+  "hypotheses": [
+    {"id": "H1", "scenarios": ["facies"], "n_wells": 50, "method": "loocv",
+     "claim": "Picking the type by leave-one-out cross-validation lowers regret in the facies scenario",
+     "source": "main study, facies 50 wells: -0.32 $MM, uncorrected 95% CI excluded 0, Holm p 0.30"},
+    {"id": "H2", "scenarios": ["skewed"], "n_wells": 50, "method": "normal_score",
+     "claim": "The normal-score semivariogram lowers regret for skewed porosity",
+     "source": "main study, skewed 50 wells: -0.33 $MM, Holm p 0.58"},
+    {"id": "H3", "scenarios": ["gaussian", "skewed", "anisotropic", "facies"], "n_wells": 25, "method": "loocv",
+     "claim": "Cross-validation pick lowers regret at 25 wells across the four main-study scenarios",
+     "source": "main study, 25 wells: -0.17 $MM, Holm p 0.94"},
+    {"id": "H4", "scenarios": ["outliers"], "n_wells": 50, "method": "pairwise_relative",
+     "claim": "The pairwise relative variogram lowers regret when 10% of well values are gross errors",
+     "source": "theory: robustness to outliers (Isaaks & Srivastava; Deutsch & Journel)"},
+    {"id": "H5", "scenarios": ["outliers"], "n_wells": 50, "method": "rodogram",
+     "claim": "The rodogram lowers regret when 10% of well values are gross errors",
+     "source": "theory: square-root differences down-weight outliers"},
+    {"id": "H6", "scenarios": ["proportional"], "n_wells": 50, "method": "general_relative",
+     "claim": "The general relative variogram lowers regret under a strong proportional effect",
+     "source": "theory: relative variograms remove the dependence of local variance on the local mean"},
+    {"id": "H7", "scenarios": ["facies"], "n_wells": 50, "method": "indicator_categorical",
+     "claim": "The categorical (facies) indicator variogram, gamv type 10, lowers regret in the facies scenario",
+     "source": "theory: facies continuity controls a sand/shale porosity field"}
+  ],
+  "secondary_descriptive_only": [
+    "indicator_continuous (gamv type 9, threshold = well median) in every scenario",
+    "truth_variogram and idw benchmarks in every scenario"
+  ],
+  "new_scenarios": {
+    "outliers": "Truth exactly as the main-study 'gaussian' scenario. At the wells only, round(10%) of wells (chosen at random) record porosity + N(0, 0.10), clipped to [0.01, 0.40]. Maps are built from the recorded values; regret uses the true porosity.",
+    "proportional": "phi = m(x) * (1 + 0.35 y), clipped to [0.01, 0.40]. m(x) = 0.16 + 0.05 z1 clipped to [0.05, 0.30], z1 a standardized spherical field (range 800 m, no nugget); y a standardized spherical field (range 300 m, nugget 0.1). Local standard deviation is proportional to the local mean."
+  },
+  "unchanged_from_main_study": "grid, OOIP model, economics, designs (random/preferential), lag rules, azimuth inference, fitting grid, declustering, kriging, well-placement optimizer (greedy + swap)"
+}

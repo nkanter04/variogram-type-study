@@ -1,0 +1,5 @@
+{
+  "seed": 31337,
+  "n_truths_per_scenario": 200,
+  "runtime_s": 691
+}
