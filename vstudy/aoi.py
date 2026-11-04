@@ -13,7 +13,6 @@ Demonstration case: anisotropic scenario (true azimuth 045, ranges 600 / 150 m),
 import json
 import os
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -21,6 +20,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
 from . import config as C, kriging, sgs
+from .areas import AOI
 from .pipeline import build_truth, build_dataset, HERE
 
 CASE = dict(stage='main', scenario='anisotropic', real=0, n_wells=25, design='random')
@@ -28,34 +28,6 @@ N_SIM = 100                      # realizations per variogram model (distributio
 AOI_SIZE = 20                    # local AOI side in cells (200 m x 200 m, about one well spacing)
 RANGES = [100.0, 200.0, 400.0, 800.0]   # isotropic ranges for the range-sensitivity sweep
 FOLDER = os.path.join(HERE, 'results', 'aoi')
-
-
-@dataclass(frozen=True)
-class AOI:
-    name: str
-    rows: slice
-    cols: slice
-
-    def mean(self, f):
-        """Average over the AOI of a field (NY, NX) or a stack (n, NY, NX)."""
-        return np.asarray(f)[..., self.rows, self.cols].mean(axis=(-2, -1))
-
-    def ooip(self, f):
-        """OOIP inside the AOI, MMSTB."""
-        return C.ooip_cells(np.asarray(f)[..., self.rows, self.cols]).sum(axis=(-2, -1)) / 1e6
-
-    def extent(self):
-        x0, x1 = C.XMIN + self.cols.start * C.XSIZ, C.XMIN + self.cols.stop * C.XSIZ
-        y1, y0 = C.YMAX - self.rows.start * C.YSIZ, C.YMAX - self.rows.stop * C.YSIZ
-        return x0, x1, y0, y1
-
-    def to_dict(self):
-        return dict(name=self.name, rows=[int(self.rows.start), int(self.rows.stop)],
-                    cols=[int(self.cols.start), int(self.cols.stop)])
-
-    @staticmethod
-    def from_dict(d):
-        return AOI(d['name'], slice(*d['rows']), slice(*d['cols']))
 
 
 GLOBAL = AOI('global (whole field)', slice(0, C.NY), slice(0, C.NX))

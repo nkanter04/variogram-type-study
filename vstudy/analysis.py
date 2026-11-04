@@ -114,3 +114,46 @@ def rule_vs_kriging(dec, methods=('semivariogram', 'normal_score', 'loocv', 'tru
                 mean, lo, hi, g = truth_level_diff(dec, 'regret_MM', dict(method=m + suf, n_wells=n), dict(method=m, n_wells=n))
                 rows.append(dict(rule=rule, method=m, n_wells=n, diff_MM=mean, ci_lo=lo, ci_hi=hi))
     return pd.DataFrame(rows).set_index(['rule', 'method', 'n_wells'])
+
+
+# ------------------------------------------------------------------ areas of interest (fixed before modelling)
+AOI_ORDER = list(C.AOIS)
+AOI_RULES = {'kriged map': 'kriged map', 'SGS expected value': 'sgs_ev', 'SGS risk-averse (P10)': 'sgs_p10'}
+
+
+def aoi_accuracy(aoi, source='map', methods=C.VTYPES + ['loocv', 'truth_variogram', 'idw', 'naive']):
+    """Mean absolute OOIP error (%) in each AOI, by estimation method."""
+    a = aoi[(aoi.source == source) & aoi.method.isin(methods)]
+    t = a.pivot_table(index='aoi', columns='method', values='abs_err_pct', aggfunc='mean')
+    return t.reindex(index=AOI_ORDER, columns=[m for m in methods if m in t.columns])
+
+
+def aoi_type_spread(aoi, source='map'):
+    """How far apart the 8 variogram types put the AOI OOIP: (max - min) / true OOIP, %, averaged over
+    datasets, by AOI and well count."""
+    a = aoi[(aoi.source == source) & aoi.method.isin(C.VTYPES)]
+    g = a.groupby(KEY + ['aoi'])
+    sp = (100 * (g.est_ooip.max() - g.est_ooip.min()) / g.true_ooip.first()).rename('spread').reset_index()
+    return sp.pivot_table(index='aoi', columns='n_wells', values='spread', aggfunc='mean').reindex(AOI_ORDER)
+
+
+def aoi_decision_summary(dec, methods=C.VTYPES + ['loocv', 'truth_variogram', 'idw']):
+    """Per rule and method: mean regret ($MM), % choosing the truly best local AOI, % same choice as the semivariogram."""
+    rows = []
+    for label, rule in AOI_RULES.items():
+        d = dec[dec.rule == rule]
+        semi = d[d.method == 'semivariogram'].set_index(KEY).chosen
+        for m in methods:
+            dm = d[d.method == m].set_index(KEY)
+            if not len(dm):
+                continue
+            rows.append(dict(rule=label, method=m, regret_MM=dm.regret_MM.mean(), pct_best=100 * (dm.chosen == dm.best).mean(),
+                             pct_same_as_semi=100 * (dm.chosen == semi.reindex(dm.index)).mean()))
+    return pd.DataFrame(rows).set_index(['rule', 'method'])
+
+
+def aoi_paired(dec, methods=C.VTYPES[1:] + ['loocv', 'truth_variogram', 'idw']):
+    """{rule: paired table}: AOI-decision regret of each method minus the semivariogram (clustered, Holm)."""
+    return {label: paired_table(dec[(dec.rule == rule) & dec.method.isin(methods + ['semivariogram'])], 'regret_MM',
+                                [m for m in methods if (dec[dec.rule == rule].method == m).any()])
+            for label, rule in AOI_RULES.items()}

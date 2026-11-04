@@ -13,6 +13,7 @@ from scipy.stats import skew
 
 from . import config as C
 from . import crossval, decisions as D, fitting, kriging, sgs, wells as W
+from .areas import STUDY_AOIS, LOCAL
 from .simulate import make_truth, truth_rng
 from .variography import Truth, experimental
 
@@ -57,7 +58,8 @@ def run_truth(args):
     T = dict(truths=[dict(scenario=scenario, realization=real, true_ooip=true_ooip, opt_value=v_opt,
                           mean_phi=phi.mean(), std_phi=phi.std(), skew_phi=float(skew(phi.ravel())),
                           **{f'ref_{k}': v for k, v in ref.items()}, ref_vario_rmse=truth.short_rmse(ref))],
-             fits=[], estimates=[], decisions=[], uncertainty=[], simulation=[])
+             fits=[], estimates=[], decisions=[], uncertainty=[], simulation=[], aoi=[], aoi_decisions=[])
+    true_aoi = {a.name: (float(a.mean(phi)), float(a.ooip(phi))) for a in STUDY_AOIS}
 
     for n_wells in C.WELL_COUNTS:
         for design in C.DESIGNS:
@@ -92,6 +94,15 @@ def run_truth(args):
                            ooip_err_pct=100 * (float(C.ooip_total(est)) - true_ooip) / true_ooip,
                            loocv_choice=choice if row['method'] == 'loocv' else None)
 
+            # ---- volumetrics in the fixed areas of interest, and which local AOI to develop
+            for meth in MAP_METHODS + ['naive']:
+                est = {a.name: float(a.ooip(maps[meth])) for a in STUDY_AOIS}
+                for a in STUDY_AOIS:
+                    T['aoi'].append(dict(**key, method=meth, source='map', aoi=a.name, true_phi=true_aoi[a.name][0],
+                                         true_ooip=true_aoi[a.name][1], est_phi=float(a.mean(maps[meth])), est_ooip=est[a.name]))
+                if meth != 'naive':
+                    T['aoi_decisions'].append(aoi_choice(key, meth, 'kriged map', {n: est[n] for n in C.AOI_CHOICE}, true_aoi))
+
             # ---- decision: place 3 wells on each map
             for meth in MAP_METHODS:
                 dv = D.drainage_value(maps[meth])
@@ -117,23 +128,35 @@ def run_truth(args):
                                        true_value=D.random_programs(dv_true, C.N_RANDOM, rng), est_value=np.nan))
 
             # ---- estimation by sequential Gaussian simulation, one set of realizations per variogram model
-            sim_rows, sim_dec = simulate_and_decide(stage, key, x, y, ds['ns'], all_models, choice, phi, dv_true, v_opt, true_ooip)
+            sim_rows, sim_dec, aoi_rows, aoi_dec = simulate_and_decide(stage, key, x, y, ds['ns'], all_models, choice, phi,
+                                                                       dv_true, v_opt, true_ooip, true_aoi)
             T['simulation'] += sim_rows
             T['decisions'] += sim_dec
+            T['aoi'] += aoi_rows
+            T['aoi_decisions'] += aoi_dec
     return T
 
 
 SIM_TAGS = {'sgs_ev': None, 'sgs_p10': C.RISK_Q}      # decision rules on the realizations
 
 
-def simulate_and_decide(stage, key, x, y, ns, all_models, choice, phi, dv_true, v_opt, true_ooip):
+def aoi_choice(key, method, rule, score, true_aoi):
+    """Develop the local AOI with the highest score (estimated OOIP, its mean or its P10).
+    Regret = true OOIP of the best local AOI minus that of the chosen one."""
+    chosen = max(score, key=score.get)
+    best = max(C.AOI_CHOICE, key=lambda n: true_aoi[n][1])
+    return dict(**key, method=method, rule=rule, chosen=chosen, best=best, true_chosen=true_aoi[chosen][1],
+                true_best=true_aoi[best][1], regret_mmstb=true_aoi[best][1] - true_aoi[chosen][1])
+
+
+def simulate_and_decide(stage, key, x, y, ns, all_models, choice, phi, dv_true, v_opt, true_ooip, true_aoi):
     """N_SGS realizations per variogram model (the 8 types and the true variogram; the cross-validation
     pick reuses its type's). Decisions (PGE 338 Lecture 16c): sgs_ev places the wells that maximize the
     expected drained OOIP over the realizations; sgs_p10 the wells that maximize its P10 (risk-averse).
     Each model's fitted standardized variogram is used for the declustered normal scores."""
     base = C.SEED_PILOT if stage == 'pilot' else C.SEED_MAIN
     ids = [C.SCEN_NAMES.index(key['scenario']), key['realization'], key['n_wells'], C.DESIGNS.index(key['design'])]
-    rows, dec = [], []
+    rows, dec, aoi_rows, aoi_dec = [], [], [], []
     for mi, meth in enumerate(C.VTYPES + ['truth_variogram']):
         reals = sgs.simulate(x, y, ns, all_models[meth], C.N_SGS, np.random.default_rng([base, *ids, 2, mi]))
         vals = np.array([D.drainage_from_ooip(C.ooip_cells(r)).ravel()[D.CAND] for r in reals])   # (L, n_cand)
@@ -153,7 +176,19 @@ def simulate_and_decide(stage, key, x, y, ns, all_models, choice, phi, dv_true, 
                 dec.append(dict(**key, method=f'{name}@{tag}', sites=' '.join(map(str, sorted(s))), opt_value=v_opt,
                                 true_value=tv, est_value=float(prog.mean()), est_p10=lo, est_p90=hi,
                                 inside_p10_p90=bool(lo <= tv <= hi)))
-    return rows, dec
+        # AOI volumetrics from the realizations: distribution of OOIP in each fixed AOI
+        a_oo = {a.name: a.ooip(reals) for a in STUDY_AOIS}                # name -> (L,) MMSTB
+        for a in STUDY_AOIS:
+            o = a_oo[a.name]
+            lo, hi = np.percentile(o, [10, 90])
+            aoi_rows.append(dict(**key, method=meth, source='SGS', aoi=a.name, true_phi=true_aoi[a.name][0],
+                                 true_ooip=true_aoi[a.name][1], est_phi=float(a.mean(reals).mean()), est_ooip=float(o.mean()),
+                                 p10_ooip=lo, p90_ooip=hi, inside_p10_p90=bool(lo <= true_aoi[a.name][1] <= hi)))
+        for tag, q in SIM_TAGS.items():
+            score = {n: float(a_oo[n].mean() if q is None else np.quantile(a_oo[n], q)) for n in C.AOI_CHOICE}
+            for name in [meth] + (['loocv'] if meth == choice else []):
+                aoi_dec.append(aoi_choice(key, name, tag, score, true_aoi))
+    return rows, dec, aoi_rows, aoi_dec
 
 
 def _finalize(parts):
@@ -166,6 +201,11 @@ def _finalize(parts):
     d['regret_pct'] = 100 * (d.opt_value - d.true_value) / d.opt_value
     d['regret_MM'] = C.to_money(d.opt_value - d.true_value)
     d['npv_MM'] = C.to_money(d.true_value) - C.K_WELLS * C.WELL_COST
+    if 'aoi' in out and len(out['aoi']):
+        a = out['aoi']
+        a['err_pct'] = 100 * (a.est_ooip - a.true_ooip) / a.true_ooip
+        a['abs_err_pct'] = a.err_pct.abs()
+        out['aoi_decisions']['regret_MM'] = C.to_money(out['aoi_decisions'].regret_mmstb)
     return out
 
 
@@ -174,7 +214,7 @@ def run_study(stage='main', workers=None, force=False, log=print):
     folder = os.path.join(HERE, 'results', stage)
     names = ['truths', 'fits', 'estimates', 'decisions', 'uncertainty']
     if not force and all(os.path.exists(os.path.join(folder, f'{n}.csv')) for n in names):
-        extra = [n for n in ['simulation'] if os.path.exists(os.path.join(folder, f'{n}.csv'))]
+        extra = [n for n in ['simulation', 'aoi', 'aoi_decisions'] if os.path.exists(os.path.join(folder, f'{n}.csv'))]
         return {n: pd.read_csv(os.path.join(folder, f'{n}.csv')) for n in names + extra}
     n_real = C.N_REAL_PILOT if stage == 'pilot' else C.N_REAL
     jobs = [(stage, s, r) for s in C.SCEN_NAMES for r in range(n_real)]

@@ -62,6 +62,14 @@ FIT_NUGS = np.round(np.arange(0.0, 0.9001, 0.025), 3)
 FIT_RANGES = np.arange(30.0, 1500.1, 20.0)
 SCORE_HSHORT = 250.0                     # variogram accuracy scored on lags <= 250 m
 
+# ---------------------------------------------------------------- areas of interest (fixed before modelling)
+# (first row, last row + 1, first col, last col + 1) in cells; row 0 = north. Same for every truth model.
+AOIS = {'field': (0, 100, 0, 100),
+        'central 400 m': (30, 70, 30, 70),
+        'NW 200 m': (15, 35, 15, 35), 'NE 200 m': (15, 35, 65, 85),
+        'SW 200 m': (65, 85, 15, 35), 'SE 200 m': (65, 85, 65, 85)}
+AOI_CHOICE = ['NW 200 m', 'NE 200 m', 'SW 200 m', 'SE 200 m']   # AOI decision: develop the best of these
+
 # ---------------------------------------------------------------- uncertainty and decisions
 N_SIM = 50                               # conditional simulations (normal-score model) for the OOIP range
 N_SGS = 50                               # sequential Gaussian simulations per variogram model and dataset
