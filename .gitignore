@@ -3,3 +3,5 @@ __pycache__/
 .ipynb_checkpoints/
 Thumbs.db
 confirmatory/smoke_results/
+confirmatory/run_log.txt
+netpay/run_log.txt
