@@ -4,3 +4,4 @@ __pycache__/
 Thumbs.db
 confirmatory/smoke_results/
 netpay/run_log.txt
+confirmatory/run_log.txt
