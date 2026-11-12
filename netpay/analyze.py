@@ -72,7 +72,7 @@ def main(pilot):
     f = pd.read_csv(os.path.join(folder, 'fits.csv'))
     acc = f.pivot_table(index='method', columns='n_wells', values=['vario_rmse', 'azi_err']).reindex(order)
     for t in (reg, net, acc):
-        t.columns = [' | '.join(map(str, c)) for c in t.columns]
+        t.columns = [', '.join(map(str, c)) for c in t.columns]
 
     tab = r[['claim', 'n_truths', 'mean_diff', 'ci95_lo', 'ci95_hi', 'p_holm', 'pct_truths_better', 'verdict']]
     text = [f"# Net-pay and maximum-likelihood results{' (EXPLORATORY PILOT - not a finding)' if pilot else ''}", '',

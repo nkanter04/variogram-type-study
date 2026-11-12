@@ -1,0 +1,12 @@
+400 truth models, seed 60606, 14 processes
+  40/400 (225 s)
+  80/400 (427 s)
+  120/400 (710 s)
+  160/400 (918 s)
+  200/400 (1108 s)
+  240/400 (1312 s)
+  280/400 (1504 s)
+  320/400 (1705 s)
+  360/400 (1902 s)
+  400/400 (2056 s)
+saved C:\Users\nkant\Projects\variogram-type-study\netpay\results (2057 s)

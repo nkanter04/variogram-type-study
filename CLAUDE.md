@@ -21,7 +21,7 @@ development decisions? Synthetic truth models make every estimate exactly scorea
   well count/design (`pipeline.dataset_rng`, `simulate.truth_rng`). New random steps must use their own keyed stream
   (as `simulate_and_decide` does), never the shared dataset `rng`, or all downstream results change. After a re-run,
   diff the existing CSVs against `git show HEAD:results/main/...` and confirm they are bit-identical.
-- **`confirmatory/hypotheses.json` is a pre-registration.** Never edit it or re-run the confirmatory study with a
+- **`confirmatory/hypotheses.json` and `netpay/hypotheses.json` are pre-registrations.** Never edit them or re-run those studies with a
   changed design and present the result as confirmatory; any new hypothesis needs a new pre-registered file and fresh
   seeds, committed before data is generated.
 - **AOIs are fixed before modelling** (`config.AOIS`, `vstudy/areas.py`). Never choose study AOIs from data or results;
@@ -35,6 +35,8 @@ development decisions? Synthetic truth models make every estimate exactly scorea
   cell centres at 5 m; **grid row 0 is the north edge**.
 - All settings live in `vstudy/config.py`; notebooks call `vstudy` functions and only plot.
 - The decision metric is regret in $MM per 3-well program (RF 0.30, $35/bbl netback).
+- `netpay/` (branch `netpay-ml` until merged) adds a net-pay cutoff decision, maximum-likelihood and constrained fits;
+  `netpay/pilot_results/` is exploratory only.
 
 ## Gotchas
 
